@@ -18,12 +18,16 @@ struct Flight {
 	string to_location;
 	string departure_day;
 	string departure_time;
+        string arrival_day;
 	string arrival_time;
 	string flight_duration;
-	string flight_price_eco;
-	string numSeats_eco;
-	string flight_price_bus;
-	string numSeats_bus;
+        string aircraft_id;
+        int numSeat_eco;
+        int numSeat_bus;
+        int first_seat;
+        double flight_price_eco;
+        double flight_price_bus;
+        double first_price;
 };
 
 struct Record {
@@ -36,6 +40,18 @@ struct Record {
 	string contact_num;
 	string email;
 };
+
+struct Booking {
+    string ticket_id;
+    string flight_id;
+    string departure_time;
+    string passenger_name;
+    int seat_class;
+    int num_seats;
+    float ticket_price;
+    bool payment_status;
+};
+
 
 int main_menu(int& option);
 void user_menu(User user);
@@ -505,4 +521,293 @@ string minToHourMin(string duration) {
 	flight_duration = to_string(hour) + "hour(s) " + to_string(min) + "min(s)";
 
 	return flight_duration;
+}
+
+
+
+
+void searchFlights() {
+    ifstream infile("flight.txt");
+    Flight flight;
+
+    int choice;
+    string keyword;
+
+    cout << "Search by:" << endl;
+    cout << "1. Departure location" << endl;
+    cout << "2. Arrival location" << endl;
+    cout << "Enter choice: ";
+    cin >> choice;
+
+    if (choice == 1) {
+        cout << "Enter departure location: ";
+        cin >> keyword;
+
+        while (infile >> flight.flight_id >> flight.from_location >> flight.to_location
+            >> flight.departure_day >> flight.departure_time >> flight.arrival_day
+            >> flight.arrival_time >> flight.aircraft_id) {
+
+            if (flight.from_location == keyword) {
+                cout << "Flight ID: " << flight.flight_id << endl;
+                cout << "Departure Location: " << flight.from_location << endl;
+                cout << "Arrival Location: " << flight.to_location << endl;
+                cout << "Departure Date: " << flight.departure_day << endl;
+                cout << "Departure Time: " << flight.departure_time << endl;
+                cout << "Arrival Date: " << flight.arrival_day << endl;
+                cout << "Arrival Time: " << flight.arrival_time << endl;
+                cout << "Aircraft ID: " << flight.aircraft_id << endl;
+                cout << "----------------------------------------" << endl;
+            }
+        }
+
+    }
+    else if (choice == 2) {
+        cout << "Enter arrival location: ";
+        cin >> keyword;
+
+        while (infile >> flight.flight_id >> flight.from_location >> flight.to_location
+            >> flight.departure_day >> flight.departure_time >> flight.arrival_day
+            >> flight.arrival_time >> flight.aircraft_id) {
+
+            if (flight.to_location == keyword) {
+                cout << "Flight ID: " << flight.flight_id << endl;
+                cout << "Departure Location: " << flight.from_location << endl;
+                cout << "Arrival Location: " << flight.to_location << endl;
+                cout << "Departure Date: " << flight.departure_day << endl;
+                cout << "Departure Time: " << flight.departure_time << endl;
+                cout << "Arrival Date: " << flight.arrival_day << endl;
+                cout << "Arrival Time: " << flight.arrival_time << endl;
+                cout << "Aircraft ID: " << flight.aircraft_id << endl;
+                cout << "----------------------------------------" << endl;
+            }
+        }
+    }
+
+    infile.close();
+}
+
+int main() {
+    searchFlights();
+
+    return 0;
+}
+
+void updateFlight(string flight_id, int seat_class, int num_seats) {
+    string filename = "flight.txt";
+    ifstream fin(filename);
+    ofstream fout("record.txt");
+    string line;
+    bool found = false;
+    while (getline(fin, line)) {
+        if (line.find(flight_id) != string::npos) {
+            found = true;
+            int pos = line.find_last_of("|") + 1;
+            int num_seats_eco = stoi(line.substr(pos, 3));
+            int num_seats_bus = stoi(line.substr(pos + 4, 3));
+            if (seat_class == 1) {
+                num_seats_eco -= num_seats;
+                line.replace(pos, 3, to_string(num_seats_eco));
+            }
+            else if (seat_class == 2) {
+                num_seats_bus -= num_seats;
+                line.replace(pos + 4, 3, to_string(num_seats_bus));
+            }
+        }
+        fout << line << endl;
+    }
+    fin.close();
+    fout.close();
+    remove(filename.c_str());
+    rename("record.txt", filename.c_str());
+    if (!found) {
+        cout << "Flight with ID " << flight_id << " not found." << endl;
+    }
+}
+
+void cancelBooking(string ticket_id) {
+    string filename = "record.txt";
+    ifstream fin(filename);
+    ofstream fout("record_temp.txt");
+    string line;
+    bool found = false;
+    while (getline(fin, line)) {
+        Booking booking;
+        booking.ticket_id = line.substr(0, line.find("|"));
+        if (booking.ticket_id == ticket_id) {
+            booking.flight_id = line.substr(line.find("|") + 1, line.find_last_of("|") - line.find("|") - 1);
+            booking.departure_time = line.substr(line.find_last_of("|") + 1);
+            booking.num_seats = stoi(line.substr(line.find_last_of("|") - 1, 1));
+            booking.seat_class = stoi(line.substr(line.find_last_of("|") - 3, 1));
+            booking.payment_status = (line[line.length() - 2] == '1');
+            found = true;
+
+            if (line[line.length() - 2] == '0') {
+                line.replace(0, 6, "000000");
+                fout << line << endl;
+                if (booking.seat_class == 1) {
+                    updateFlight(booking.flight_id, booking.seat_class, booking.num_seats);
+                    cout << "Booking with ticket ID " << ticket_id << " has been cancelled." << endl;
+                }
+                else if (booking.seat_class == 2) {
+                    updateFlight(booking.flight_id, booking.seat_class, booking.num_seats);
+                    cout << "Booking with ticket ID " << ticket_id << " has been cancelled." << endl;
+                }
+            }
+            else {
+                cout << "Payment has already been made for this booking. Cancellation not allowed." << endl;
+            }
+        }
+        else {
+            fout << line << endl;
+        }
+    }
+    fin.close();
+    fout.close();
+    remove(filename.c_str());
+    rename("record_temp.txt", filename.c_str());
+    if (!found) {
+        cout << "Booking with ticket ID " << ticket_id << " not found." << endl;
+    }
+}
+
+
+int main() {
+    string ticket_id;
+    cout << "Enter the ticket ID to cancel: ";
+    cin >> ticket_id;
+    cancelBooking(ticket_id);
+    return 0;
+}
+
+void dropFlight() {
+
+    ifstream fin("flight.txt");
+    if (!fin) {
+        cout << "Error: Unable to open the flight file." << endl;
+        return;
+    }
+
+    ifstream rfin("record.txt");
+    if (!rfin) {
+        cout << "Error: Unable to open the record file." << endl;
+        return;
+    }
+
+    ofstream fout("temp.txt");
+    if (!fout) {
+        cout << "Error: Unable to open the record file." << endl;
+        return;
+    }
+
+    string flight_id;
+    cout << "Enter the flight ID to drop: ";
+    cin >> flight_id;
+
+    string line;
+    bool found = false;
+    while (getline(fin, line)) {
+
+        string id = line.substr(0, 7);
+
+        if (id == flight_id) {
+
+            found = true;
+
+            int numSeat_eco = 103;
+            int numSeat_bus = 35;
+            int numSeat = numSeat_eco + numSeat_bus;
+
+            int booked_seat;
+            char flightClass;
+            cout << "Enter the number of seat booked: ";
+            cin >> booked_seat;
+            cout << "Enter the class (E/B) of seat booked: ";
+            cin >> flightClass;
+
+            if (flightClass == 'E') {
+                numSeat_eco -= booked_seat;
+            }
+            else if (flightClass == 'B') {
+                numSeat_bus -= booked_seat;
+            }
+
+            numSeat = numSeat_eco + numSeat_bus;
+
+            string newLine = line.substr(0, 83) + to_string(numSeat_eco) + line.substr(86, 13) + to_string(numSeat_bus) + line.substr(100, 38) + to_string(numSeat) + line.substr(139);
+
+            fout << newLine << endl;
+        }
+        else {
+
+            fout << line << endl;
+        }
+    }
+
+    if (!found) {
+        cout << "Error: Flight not found." << endl;
+        return;
+    }
+
+    while (getline(rfin, line)) {
+
+        string id = line.substr(13, 7);
+
+
+        if (id == flight_id) {
+
+            string newLine = line.substr(0, 4) + "0000000" + line.substr(11);
+
+            fout << newLine << endl;
+        }
+        else {
+
+            fout << line << endl;
+        }
+    }
+
+
+    fin.close();
+    rfin.close();
+    fout.close();
+
+    remove("flight.txt");
+    rename("temp.txt", "flight.txt");
+
+    cout << "Flight " << flight_id << " dropped successfully." << endl;
+}
+
+int main() {
+    dropFlight();
+    return 0;
+}
+
+void updateFlight(string flight_id, Flight newFlight) {
+    ifstream inFile("flight.txt");
+    ofstream outFile("record.txt");
+    Flight flight;
+
+    while (getline(inFile, flight.flight_id, '|') && getline(inFile, flight.from_location, '|') &&
+        getline(inFile, flight.to_location, '|') && getline(inFile, flight.departure_day, '|') &&
+        getline(inFile, flight.departure_time, '|') && getline(inFile, flight.arrival_time, '|') &&
+        inFile >> flight.numSeat_eco >> flight.numSeat_bus >> flight.first_seat >> flight.flight_price_eco >>
+        flight.flight_price_bus >> flight.first_price) {
+        if (flight.flight_id == flight_id) {
+            flight = newFlight;
+        }
+        outFile << flight.flight_id << "|" << flight.from_location << "|" << flight.to_location << "|"
+            << flight.departure_day << "|" << flight.departure_time << "|" << flight.arrival_time << "|"
+            << flight.numSeat_eco << "|" << flight.numSeat_bus << "|" << flight.first_seat << "|"
+            << flight.flight_price_eco << "|" << flight.flight_price_bus << "|" << flight.first_price << "|\n";
+        inFile.ignore(numeric_limits<streamsize>::max(), '\n');
+    }
+    inFile.close();
+    outFile.close();
+    remove("flight.txt");
+    rename("record.txt", "flight.txt");
+}
+
+int main() {
+    Flight newFlight{ "TL003ID", "East Timor", "Malaysia", "Tuesday", "0800", "1020", 80, 30, 10, 100, 200, 300 };
+    updateFlight("TL003ID", newFlight);
+    return 0;
 }
